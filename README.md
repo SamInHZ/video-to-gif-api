@@ -1,20 +1,20 @@
 # Video to GIF API
 
-基于 **FastAPI** 的小服务：传入**可直接下载的视频 URL**，用 **FFmpeg** 转成 GIF，并通过 HTTP 返回可访问的 GIF 链接。临时文件会按策略清理。
+A small **FastAPI** service: you pass a **direct video URL**, it downloads the file, converts it to a GIF with **FFmpeg**, and returns an HTTP-accessible link to the GIF. Temporary files are cleaned up on a schedule.
 
-## 功能
+## Features
 
-- `POST /video2gif` — 下载视频（如 mp4），转为 GIF，响应里返回 GIF 的 URL  
-- `GET /health` — 健康检查  
-- `POST /cleanup` — 手动清理 `tmp_video` 下超过 24 小时的文件  
-- 后台按间隔执行定时清理（与 `main_api.py` 中配置一致）
+- `POST /video2gif` — download a video (e.g. mp4), convert to GIF, return a fetchable GIF URL in the response  
+- `GET /health` — health check  
+- `POST /cleanup` — manually remove files under `tmp_video` older than 24 hours  
+- Background periodic cleanup (see `main_api.py` for intervals)
 
-## 环境要求
+## Requirements
 
-- Python 3.10+（推荐）  
-- 系统已安装 **ffmpeg** 且在 `PATH` 中（`ffmpeg -version` 可执行）
+- Python 3.10+ recommended  
+- **ffmpeg** installed and on your `PATH` (`ffmpeg -version`)
 
-## 快速开始
+## Quick start
 
 ```bash
 cd video2gif
@@ -24,16 +24,16 @@ pip install -r requirements.txt
 python main_api.py
 ```
 
-默认监听 `http://0.0.0.0:15999`。接口文档：[Swagger UI](http://127.0.0.1:15999/docs)。
+Listens on `http://0.0.0.0:15999` by default. API docs: [Swagger UI](http://127.0.0.1:15999/docs).
 
-### 环境变量（可选）
+### Environment variables (optional)
 
-| 变量 | 说明 | 默认 |
-|------|------|------|
-| `PORT` | 监听端口 | `15999` |
-| `PUBLIC_BASE_URL` | 响应里 GIF 完整 URL 的前缀（不要末尾 `/`） | `http://127.0.0.1:{PORT}` |
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `PORT` | Listen port | `15999` |
+| `PUBLIC_BASE_URL` | Base URL prefix for absolute GIF links in responses (no trailing `/`) | `http://127.0.0.1:{PORT}` |
 
-反向代理或自定义域名时设置 `PUBLIC_BASE_URL`，例如：
+Behind a reverse proxy or custom host, set `PUBLIC_BASE_URL`, for example:
 
 ```bash
 export PUBLIC_BASE_URL=https://your-domain.com
@@ -41,21 +41,21 @@ export PORT=15999
 python main_api.py
 ```
 
-GIF 地址形如：`{PUBLIC_BASE_URL}/tmp_video/<id>.gif`（由 FastAPI `StaticFiles` 挂载 `./tmp_video`）。
+GIF URLs look like `{PUBLIC_BASE_URL}/tmp_video/<id>.gif` (served via FastAPI `StaticFiles` from `./tmp_video`).
 
 ## API
 
 ### `POST /video2gif`
 
-请求体 JSON：
+JSON body:
 
-| 字段 | 类型 | 必填 | 默认 | 说明 |
-|------|------|------|------|------|
-| `url` | string | 是 | — | 视频直链 |
-| `fps` | int | 否 | 5 | 约 1–60 |
-| `scale` | float | 否 | 0.5 | 相对宽高缩放（0.5 ≈ 一半宽高） |
+| Field | Type | Required | Default | Notes |
+|-------|------|----------|---------|-------|
+| `url` | string | yes | — | Direct video URL |
+| `fps` | int | no | 5 | Roughly 1–60 |
+| `scale` | float | no | 0.5 | Relative scale (0.5 ≈ half width and height) |
 
-示例：
+Example:
 
 ```bash
 curl -s -X POST "http://127.0.0.1:15999/video2gif" \
@@ -63,7 +63,7 @@ curl -s -X POST "http://127.0.0.1:15999/video2gif" \
   -d '{"url":"https://example.com/demo.mp4","fps":8,"scale":0.5}'
 ```
 
-成功时响应示例：
+Example success response:
 
 ```json
 {
@@ -84,13 +84,13 @@ curl -s http://127.0.0.1:15999/health
 curl -s -X POST http://127.0.0.1:15999/cleanup
 ```
 
-## 本地 CLI（不启动服务）
+## CLI (no server)
 
 ```bash
 python video_to_gif.py /path/to/input.mp4 -o out.gif --fps 8 --scale 0.5
 ```
 
-## 测试脚本
+## Example client script
 
 ```bash
 pip install -r requirements-dev.txt
@@ -98,23 +98,23 @@ export VIDEO_URL="https://example.com/your-video.mp4"
 python test_api.py
 ```
 
-## 目录结构
+## Layout
 
 ```
 video2gif/
-├── main_api.py           # FastAPI 应用
-├── video_to_gif.py       # 本地 ffmpeg 命令行封装
-├── test_api.py           # 示例 HTTP 调用（勿提交带签名/私有的 URL）
+├── main_api.py           # FastAPI app
+├── video_to_gif.py       # Local ffmpeg CLI helper
+├── test_api.py           # Sample HTTP client (avoid committing signed/private URLs)
 ├── requirements.txt
-├── requirements-dev.txt  # test_api 额外依赖
+├── requirements-dev.txt  # Extra deps for test_api.py
 ├── README.md
 ├── .gitignore
-├── tmp_video/            # 运行时创建（已 gitignore）
-└── logs/                 # 滚动日志（已 gitignore）
+├── tmp_video/            # Created at runtime (gitignored)
+└── logs/                 # Rotating logs (gitignored)
 ```
 
-## 说明
+## Notes
 
-- GIF 往往比原视频大，可适当降低 `fps` 和 `scale`。  
-- 视频下载超时默认 300 秒；若需更长可在 `main_api.py` 中调整 `httpx.AsyncClient(timeout=...)`。  
-- 若部署在生产环境，建议在网关侧限制并发、请求体大小与来源，并按机器资源调优。
+- GIFs are often larger than the source video; lower `fps` and `scale` to reduce size.  
+- Video download timeout defaults to 300 seconds; adjust `httpx.AsyncClient(timeout=...)` in `main_api.py` if you need longer.  
+- For production, restrict concurrency, payload size, and allowed origins at the gateway, and tune for your CPU and disk.
